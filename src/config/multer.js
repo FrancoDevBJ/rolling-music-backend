@@ -107,7 +107,7 @@ const uploadSongAndCover = multer({
 });
 
 const uploadPlayListImg = multer({
-    storage: universalStorage,
+    storage: songStorage,
     limits: { fileSize: 2 * 1024 * 1024 }, //2MB máximo
     fileFilter: multerFilter
 }).single('img');

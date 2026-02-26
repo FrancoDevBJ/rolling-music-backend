@@ -23,7 +23,7 @@ connectDB()
 createSuperAdmin();
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
+    origin: [process.env.FRONTEND_URL, "http://localhost:5173"],
     credentials: true
 }));
 app.use(morgan("dev"));
@@ -35,7 +35,7 @@ app.use(express.urlencoded({extended: true}));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
     setHeaders: (res, path) => {
         // 🛠️ 1. Permitir que el frontend (Vite) lea el archivo
-        res.set('Access-Control-Allow-Origin', 'http://localhost:5173');
+        res.set('Access-Control-Allow-Origin', 'https://rolling-music-frontend.vercel.app');
         
         // 🛠️ 2. FORZAR REPRODUCCIÓN (Esto mata la descarga)
         // 'inline' le dice al navegador que lo abra en el reproductor interno
@@ -60,5 +60,5 @@ app.use(errorHanlder);
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.log(`Servidor corriendo en http://localhost:${port}`)
+    console.log(`Servidor corriendo en ${port}`)
 })

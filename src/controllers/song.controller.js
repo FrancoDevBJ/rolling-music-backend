@@ -1,3 +1,4 @@
+const cloudinary = require('../config/cloudinary');
 const Songs = require('../models/Song');
 const { deleteOneFile, cleanUploadsFiles, deleteFiles, getCompleteRoute } = require('../utils/fileCleanup')
 
@@ -90,7 +91,6 @@ const createSong = async (req, res, next) => {
 
         // 2. Verificar archivos
         if(!req.files || !req.files.cover || !req.files.audio){
-            cleanUploadsFiles(req);
             return res.status(400).json({
                 ok: false,
                 message: 'Debe subir la portada y el audio de la canción'
@@ -106,7 +106,9 @@ const createSong = async (req, res, next) => {
             // para que Mongoose no de error si es 'required'
             duration: duration || 0, 
             cover: req.files.cover[0].path,
-            audio: req.files.audio[0].path
+            audio: req.files.audio[0].path,
+            coverPublicId: req.files.cover[0].filename,
+            audioPublicId: req.files.audio[0].filename
         });
 
         // 4. Guardar en mongo
@@ -120,7 +122,6 @@ const createSong = async (req, res, next) => {
         
     } catch (error) {
         // Si hay error de validación de Mongoose, limpiamos archivos subidos
-        cleanUploadsFiles(req)
         next(error)
     }
 }
@@ -203,12 +204,8 @@ const deleteSong = async (req, res, next) => {
             })
         }
 
-        //4- Eliminar la imagen y la canción
-        const coverPath = getCompleteRoute(song.cover, 'covers');
-        const audioPath = getCompleteRoute(song.audio, 'songs');
-
-        //5- Eliminamos las imagenes viejas usando las rutas que guardamos antes
-        deleteFiles([coverPath, audioPath]);
+        await cloudinary.uploader.destroy(song.coverPublicId, { resource_type: "image" });
+        await cloudinary.uploader.destroy(song.audioPublicId, { resource_type: "video" });
 
         //6- Eliminar la cancion en mongo
         await Songs.findByIdAndDelete(id);

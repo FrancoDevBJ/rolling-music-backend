@@ -23,7 +23,14 @@ const songSchema = new mongoose.Schema({
     cover: {
         type: String,
         required: true,
-        default: "https://rolling-music.vercel.app/assets/Logo-CK57mjsi.png"
+    },
+    coverPublicId: {
+        type: String,
+        required: true
+    },
+    audioPublicId: {
+        type: String,
+        required: true
     }
 
 },{

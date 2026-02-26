@@ -105,8 +105,8 @@ const createSong = async (req, res, next) => {
             // Si duration no viene del front, le asignamos un valor por defecto 
             // para que Mongoose no de error si es 'required'
             duration: duration || 0, 
-            cover: req.files.cover[0].filename,
-            audio: req.files.audio[0].filename
+            cover: req.files.cover[0].path,
+            audio: req.files.audio[0].path
         });
 
         // 4. Guardar en mongo
@@ -161,14 +161,14 @@ const updateSong = async (req, res, next) => {
         deleteFiles([oldCoverPath])
 
         //Asignamos las imagenes nuevas en mongo
-        song.cover = req.files.cover[0].filename;
+        song.cover = req.files.cover[0].path;
         }
 
         // Si subieron una nuevo audio
         if (req.files && req.files.audio){
             const oldAudioPath = getCompleteRoute(song.audio, 'songs');
             deleteFiles([oldAudioPath]);
-            song.audio = req.files.audio[0].filename;
+            song.audio = req.files.audio[0].path;
         }
 
         //6- Actulizamos la cancion en mongo con el save()

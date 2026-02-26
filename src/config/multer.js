@@ -1,4 +1,6 @@
 const multer = require('multer');
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloudinary");
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -42,25 +44,28 @@ const uploadProfile = multer({
 
 
 
-const universalStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        let folder = 'songs'; //Carpeta creada por defecto
-        if (file.fieldname === 'cover') folder = 'covers';
-        if (file.fieldname === 'img') folder = 'playlists';
+const songStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: async (req, file) => {
+        let folder = "songs";
+        let resource_type = "auto";
 
-        const uploadPath = path.join(__dirname, `../../uploads/${folder}`);
-        if (!fs.existsSync(uploadPath)){
-            fs.mkdirSync(uploadPath, {recursive: true});
+        if (file.fieldname === "cover") {
+            folder = "covers";
+            resource_type = "image";
         }
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        let prefix = 'audio';
-        if (file.fieldname === 'cover') prefix = 'cover';
-        if (file.fieldname === 'img') prefix = 'img';
 
-        const uniqueSuffix = Date.now() + `-${prefix}-` + crypto.randomUUID() + path.extname(file.originalname);
-        cb(null, uniqueSuffix);
+        if (file.fieldname === "audio") {
+            folder = "songs";
+            resource_type = "video"; 
+            // Cloudinary trata audio como video
+        }
+
+        return {
+            folder: `rollingMusic/${folder}`,
+            resource_type,
+            public_id: `${Date.now()}-${file.originalname}`
+        };
     }
 });
 
@@ -96,7 +101,7 @@ const multerFilter = (req, file, cb) => {
 
 //Exportar el nuevo middleware
 const uploadSongAndCover = multer({
-    storage: universalStorage,
+    storage: songStorage,
     limits: {fileSize: 15 * 1024 * 1024}, //Se va a 15MB para que entren los dos
     fileFilter: multerFilter
 });

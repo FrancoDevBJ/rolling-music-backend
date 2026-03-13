@@ -1,91 +1,147 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require("resend");
 
-//CONFIGURAR EL "TRANSPORTER" DE NODEMAILER
-const transporter = nodemailer.createTransport({
-    service:'gmail',
-    auth:{
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_APP_PASSWORD
-    }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-//ENVIAR EMAIL DE VERIFICACION
 const sendVerificationEmail = async (email, userName, userCode) => {
-    const mailOptions = {
-    from:`"RollingMusic 📀" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Verifica tu cuenta - RollingMusic 📀',
-    html:`
-    <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-            }
-            .container {
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-              background-color: #202020;
-            }
-            .content {
-              background-color: white;
-              padding: 30px;
-              border-radius: 10px;
-            }
-            .code {
-              font-size: 32px;
-              font-weight: bold;
-              color: #4B0082;
-              text-align: center;
-              padding: 20px;
-              background-color: #202020;
-              border-radius: 5px;
-              letter-spacing: 5px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 20px;
-              font-size: 12px;
-              color: #949494;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="content">
-              <h2>¡Bienvenido/a ${userName}!</h2>
-              <p>Gracias por registrarte en nuestra plataforma.</p>
-              <p>Para completar tu registro, por favor verifica tu cuenta usando el siguiente código:</p>
-              <div class="code">${userCode}</div>
-              <p><strong>Este código expira en 20 minutos.</strong></p>
-              <p>Si no solicitaste este registro, puedes ignorar este email.</p>
-            </div>
-            <div class="footer">
-              <p>© 2026 Rolling Music. Todos los derechos reservados.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    
-    `
-    }
 
+const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 
-try {
-    await transporter.sendMail(mailOptions);
-    console.log(`Email de verificacion enviado a: ${email}`)
-    return true
-} catch (error) {
-    console.error('❌ Error al enviar el email:', error);
-    throw new Error('No se pudo enviar el email de verificacion')
-}
+<style>
+
+body{
+  margin:0;
+  padding:0;
+  background:#0f0f0f;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
+.container{
+  max-width:600px;
+  margin:auto;
+  padding:40px 20px;
+}
 
+.card{
+  background:#ffffff;
+  border-radius:12px;
+  padding:40px 30px;
+  text-align:center;
+}
+
+.logo{
+  font-size:28px;
+  font-weight:bold;
+  color:#7c3aed;
+  margin-bottom:20px;
+}
+
+.title{
+  font-size:22px;
+  margin-bottom:10px;
+}
+
+.text{
+  color:#555;
+  font-size:16px;
+}
+
+.code{
+  font-size:34px;
+  letter-spacing:6px;
+  font-weight:bold;
+  color:#7c3aed;
+  background:#f3f3f3;
+  padding:18px;
+  border-radius:8px;
+  margin:25px 0;
+}
+
+.button{
+  display:inline-block;
+  background:#7c3aed;
+  color:white;
+  padding:14px 28px;
+  border-radius:8px;
+  text-decoration:none;
+  font-weight:bold;
+  margin-top:10px;
+}
+
+.footer{
+  margin-top:20px;
+  font-size:12px;
+  color:#888;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+
+<div class="logo">📀 RollingMusic</div>
+
+<h2 class="title">Bienvenido ${userName}</h2>
+
+<p class="text">
+Gracias por registrarte en RollingMusic.
+Para completar tu cuenta verifica tu email.
+</p>
+
+<div class="code">
+${userCode}
+</div>
+
+<a class="button" href="#">
+Verificar cuenta
+</a>
+
+<p class="text">
+Este código expira en 20 minutos.
+</p>
+
+<div class="footer">
+© 2026 RollingMusic
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>
+`;
+
+  try {
+
+    await resend.emails.send({
+      from: "RollingMusic 📀 <onboarding@resend.dev>",
+      to: email,
+      subject: "Verifica tu cuenta - RollingMusic 📀",
+      html: htmlTemplate
+    });
+
+    console.log(`Email enviado a ${email}`);
+
+    return true;
+
+  } catch (error) {
+
+    console.error("❌ Error enviando email:", error);
+
+    throw new Error("No se pudo enviar el email");
+
+  }
+
+};
 
 module.exports = {
   sendVerificationEmail

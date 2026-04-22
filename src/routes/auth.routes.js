@@ -14,8 +14,8 @@ router.post("/login", validateLogin, login);
 
 //ENDPOINTS PRIVADOS
 router.post("/logout", auth, logout);
-router.get("/profile", auth, getUserProfile );
-router.put("/profile/update", auth, updateProfile);
-router.put("/profile/photo", auth, uploadProfile, updateProfilePhoto  );
+router.get("/profile", auth, getUserProfile);
+router.put("/profile/update", auth, uploadProfile, updateProfile); // ✅ agregado uploadProfile
+router.put("/profile/photo", auth, uploadProfile, updateProfilePhoto);
 
 module.exports = router;

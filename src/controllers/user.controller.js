@@ -115,10 +115,41 @@ const deleteUser = async (req, res) => {
     }
 }
 
+const toggleBlockUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const user = await User.findById(id);
+
+        if (!user) {
+            return res.status(404).json({ ok: false, message: 'Usuario no encontrado' });
+        }
+
+        if (user.role === process.env.SUPER_ADMIN_ROLE) {
+            return res.status(403).json({ ok: false, message: 'No se puede bloquear a este usuario.' });
+        }
+
+        user.blocked = !user.blocked;
+        await user.save();
+
+        return res.status(200).json({
+            ok: true,
+            message: `Usuario ${user.blocked ? 'bloqueado' : 'desbloqueado'} correctamente`,
+            data: { id: user._id, blocked: user.blocked }
+        });
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ ok: false, message: error.message });
+    }
+};
+
 
 module.exports = {
     getAllUsers,
     changeUserRole,
     deleteUser,
-    getUserById
+    getUserById,
+    toggleBlockUser
+
 }

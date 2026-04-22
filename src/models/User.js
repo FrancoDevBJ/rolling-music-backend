@@ -47,6 +47,10 @@ const userSchema = new mongoose.Schema({
     codeExpiration:{
         type: Date,
         default: null
+    },
+    blocked:{
+        type: Boolean,
+        default: false
     }
 
 },{

@@ -3,13 +3,28 @@ const crypto = require('crypto');
 const path = require('path');
 const { sendVerificationEmail } = require('../utils/emailService');
 const jwt = require('jsonwebtoken');
-const { deleteOneFile } = require('../utils/fileCleanup');
+const cloudinary = require('../config/cloudinary');
 
 // Función auxiliar para generar el token
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: '1h'
     });
+};
+
+// ✅ Helper para eliminar imagen de Cloudinary por URL
+const deleteCloudinaryImage = async (imageUrl) => {
+    try {
+        if (!imageUrl || imageUrl.startsWith('https://www.iconpacks') || imageUrl.startsWith('https://i.ibb')) return;
+        const parts = imageUrl.split('/');
+        const filenameWithExt = parts[parts.length - 1];
+        const filename = filenameWithExt.split('.')[0];
+        const folder = parts[parts.length - 2];
+        const public_id = `rollingMusic/${folder}/${filename}`;
+        await cloudinary.uploader.destroy(public_id);
+    } catch (err) {
+        console.error('Error al eliminar imagen de Cloudinary:', err);
+    }
 };
 
 const register = async (req, res, next) => {
@@ -21,7 +36,7 @@ const register = async (req, res, next) => {
             surname,
             email,
             password,
-            profilePic: req.file ? req.file.filename : null
+            profilePic: req.file ? req.file.path : null  // ✅ URL completa de Cloudinary
         });
 
         const code = newUser.generateVerificationCode();
@@ -32,7 +47,7 @@ const register = async (req, res, next) => {
         } catch (emailError) {
             await User.findByIdAndDelete(newUser._id);
             if (req.file) {
-                deleteOneFile(req.file.path);
+                await deleteCloudinaryImage(req.file.path);
             }
             return res.status(500).json({
                 ok: false,
@@ -102,7 +117,7 @@ const verifyEmail = async (req, res) => {
 const login = async (req, res) => {
     console.log('Cuerpo recibido en el login:', req.body);
     try {
-        const { email, password, isGoogleLogin = false, name, surname } = req.body;
+        const { email, password, isGoogleLogin = false, name, surname, photoURL } = req.body;
 
         let user = await User.findOne({ email });
 
@@ -115,7 +130,7 @@ const login = async (req, res) => {
                     password: crypto.randomBytes(16).toString('hex'),
                     verifiedEmail: true,
                     role: 'user',
-                    profilePic: req.body.photoURL || null
+                    profilePic: photoURL || null  // ✅ guardar foto de Google
                 });
                 await user.save();
             }
@@ -162,7 +177,7 @@ const login = async (req, res) => {
                 surname: user.surname,
                 email: user.email,
                 role: user.role,
-                profilePic: user.profilePic
+                profilePic: user.profilePic  // ✅ incluir foto en login
             }
         });
 
@@ -202,7 +217,7 @@ const getUserProfile = async (req, res, next) => {
     }
 };
 
-// ✅ ACTUALIZADO: maneja nombre, apellido y foto en una sola llamada
+// ✅ Maneja nombre, apellido y foto — foto va a Cloudinary
 const updateProfile = async (req, res, next) => {
     try {
         const { name, surname } = req.body;
@@ -210,14 +225,12 @@ const updateProfile = async (req, res, next) => {
 
         const updateData = { name, surname };
 
-        // Si viene una foto nueva, eliminamos la anterior y guardamos la nueva
         if (req.file) {
             const user = await User.findById(userId);
-            if (user && user.profilePic) {
-                const previousPhoto = path.join(__dirname, '../../uploads/profiles', user.profilePic);
-                deleteOneFile(previousPhoto);
+            if (user?.profilePic) {
+                await deleteCloudinaryImage(user.profilePic);
             }
-            updateData.profilePic = req.file.filename;
+            updateData.profilePic = req.file.path;  // ✅ URL completa de Cloudinary
         }
 
         const updatedUser = await User.findByIdAndUpdate(
@@ -261,11 +274,10 @@ const updateProfilePhoto = async (req, res, next) => {
         }
 
         if (user.profilePic) {
-            const previousPhoto = path.join(__dirname, '../../uploads/profiles', user.profilePic);
-            deleteOneFile(previousPhoto);
+            await deleteCloudinaryImage(user.profilePic);
         }
 
-        user.profilePic = req.file.filename;
+        user.profilePic = req.file.path;  // ✅ URL completa de Cloudinary
         await user.save();
 
         return res.status(201).json({

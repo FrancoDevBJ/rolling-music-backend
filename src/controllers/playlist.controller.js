@@ -1,20 +1,35 @@
 const Playlist = require("../models/Playlist");
-const fs = require('fs');
-const path = require('path');
-const { cleanUploadsFiles } = require("../utils/fileCleanup");
+const cloudinary = require('../config/cloudinary');
+
+// ✅ Helper para eliminar imagen de Cloudinary por URL
+const deleteCloudinaryImage = async (imageUrl) => {
+    try {
+        if (!imageUrl || imageUrl.startsWith('https://i.ibb')) return;
+        const parts = imageUrl.split('/');
+        const filenameWithExt = parts[parts.length - 1];
+        const filename = filenameWithExt.split('.')[0];
+        const folder = parts[parts.length - 2];
+        const public_id = `rollingMusic/${folder}/${filename}`;
+        await cloudinary.uploader.destroy(public_id);
+    } catch (err) {
+        console.error('Error al eliminar imagen de Cloudinary:', err);
+    }
+};
+
+const DEFAULT_PLAYLIST_IMG = 'https://i.ibb.co/ZRn36S2x/Cover-Default-Playlist.jpg';
 
 // Crear una nueva playlist
 const createPlaylist = async (req, res, next) => {
     try {
         const { name, description } = req.body;
-        // 🛠️ Cambiamos req.user.id por req.user._id (consistencia con el middleware)
-        const userId = req.user._id; 
+        const userId = req.user._id;
 
         const newPlaylist = new Playlist({
             name,
             description,
             owner: userId,
-            img: req.file ? req.file.filename : "https://i.ibb.co/ZRn36S2x/Cover-Default-Playlist.jpg"
+            // ✅ Cloudinary devuelve URL completa en req.file.path
+            img: req.file ? req.file.path : DEFAULT_PLAYLIST_IMG
         });
 
         await newPlaylist.save();
@@ -26,25 +41,22 @@ const createPlaylist = async (req, res, next) => {
         });
 
     } catch (error) {
-        cleanUploadsFiles(req);
         next(error);
     }
 };
 
-// Agregar una canción (Local o Deezer) a una playlist
+// Agregar una canción a una playlist
 const addSongToPlaylist = async (req, res, next) => {
     try {
         const { playlistId, songId } = req.params;
         const userId = req.user._id;
 
-        // Buscamos la playlist y verificamos dueño
         const playlist = await Playlist.findOne({ _id: playlistId, owner: userId });
 
-        if(!playlist){
+        if (!playlist) {
             return res.status(404).json({ ok: false, message: 'Lista de Reproducción no encontrada' });
         }
 
-        // 🛠️ $addToSet funciona igual de bien con Strings ("deezer-123" o "local-abc")
         await Playlist.findByIdAndUpdate(playlistId, {
             $addToSet: { songs: songId }
         });
@@ -59,14 +71,10 @@ const addSongToPlaylist = async (req, res, next) => {
     }
 };
 
-// Obtener todas las playlist del usuario
+// Obtener todas las playlists del usuario
 const getUserPlaylists = async (req, res, next) => {
     try {
         const userId = req.user._id;
-        
-        // 🛠️ ELIMINAMOS .populate('songs')
-        // ¿Por qué? Porque 'songs' ahora es un array de Strings (IDs híbridos).
-        // El frontend recibirá ["deezer-1", "local-2"] y las buscará en el Context.
         const playlists = await Playlist.find({ owner: userId });
 
         res.status(200).json({
@@ -84,21 +92,18 @@ const getPlaylistById = async (req, res, next) => {
         const { id } = req.params;
         const userId = req.user._id;
 
-        // Buscamos la playlist por ID y dueño
         const playlist = await Playlist.findOne({ _id: id, owner: userId });
 
         if (!playlist) {
-            return res.status(404).json({ 
-                ok: false, 
-                message: "Lista de Reproducción no encontrada" 
+            return res.status(404).json({
+                ok: false,
+                message: "Lista de Reproducción no encontrada"
             });
         }
 
-        // 🛠️ IMPORTANTE: Devolvemos 'data' porque AxiosError en tu imagen 
-        // indica que el componente espera una respuesta exitosa para continuar.
         res.status(200).json({
             ok: true,
-            data: playlist 
+            data: playlist
         });
 
     } catch (error) {
@@ -106,31 +111,24 @@ const getPlaylistById = async (req, res, next) => {
     }
 };
 
-//Actulizar playlist
+// Actualizar playlist
 const updatePlaylist = async (req, res, next) => {
     try {
-        
         const { id } = req.params;
         const userId = req.user._id;
         const { name, description } = req.body;
 
-        // 1. Buscar la playlist y verificar pertenencia
         const playlist = await Playlist.findOne({ _id: id, owner: userId });
         if (!playlist) {
-            cleanUploadsFiles(req); // Borrar la nueva si no hay permiso
             return res.status(404).json({ ok: false, message: "Lista de Reproducción no encontrada" });
         }
 
-        // 2. Si subió una imagen nueva, borrar la anterior del disco
+        // ✅ Si viene imagen nueva, eliminar la anterior de Cloudinary
         if (req.file) {
-            const oldImagePath = path.join(__dirname, `../../uploads/playlists/${playlist.img}`);
-            if (playlist.img && playlist.img !== 'https://i.ibb.co/ZRn36S2x/Cover-Default-Playlist.jpg' && fs.existsSync(oldImagePath)) {
-                fs.unlinkSync(oldImagePath);
-            }
-            playlist.img = req.file.filename;
+            await deleteCloudinaryImage(playlist.img);
+            playlist.img = req.file.path;  // URL completa de Cloudinary
         }
 
-        // 3. Actualizar campos de texto si vienen en el body
         if (name) playlist.name = name;
         if (description) playlist.description = description;
 
@@ -143,10 +141,9 @@ const updatePlaylist = async (req, res, next) => {
         });
 
     } catch (error) {
-        cleanUploadsFiles(req);
-        next(error)
+        next(error);
     }
-}
+};
 
 // Quitar una canción de la playlist
 const removeSongFromPlaylist = async (req, res, next) => {
@@ -154,7 +151,6 @@ const removeSongFromPlaylist = async (req, res, next) => {
         const { id, songId } = req.params;
         const userId = req.user._id;
 
-        // Buscamos la playlist y usamos $pull para remover el string del array
         const playlist = await Playlist.findOneAndUpdate(
             { _id: id, owner: userId },
             { $pull: { songs: songId } },
@@ -175,34 +171,25 @@ const removeSongFromPlaylist = async (req, res, next) => {
     }
 };
 
-//Eliminiar playlist
+// Eliminar playlist
 const deletePlaylist = async (req, res, next) => {
     try {
-        
         const { id } = req.params;
         const userId = req.user._id;
 
-        //1. Buscar la playlist y verificar que el sea quien intenta borrarla
         const playlist = await Playlist.findOne({ _id: id, owner: userId });
 
-        if (!playlist){
+        if (!playlist) {
             return res.status(404).json({
                 ok: false,
                 message: 'Lista de Reproducción no encontrada o no tiene permiso para eliminarla'
             });
         }
 
-        //2. Si la playlist tiene una imagen y no es la imagen por defecto, guardamos la ruta
-        const imagePath = playlist.img && playlist.img !== 'https://i.ibb.co/ZRn36S2x/Cover-Default-Playlist.jpg' 
-        ? path.join(__dirname, `../../uploads/playlists/${playlist.img}`) : null;
+        // ✅ Eliminar imagen de Cloudinary si no es la por defecto
+        await deleteCloudinaryImage(playlist.img);
 
-        //3. Eliminar de la base de datos
         await Playlist.findByIdAndDelete(id);
-
-        //4. Eliminar el archivo fisico si existe
-        if (imagePath && fs.existsSync(imagePath)){
-            fs.unlinkSync(imagePath);
-        }
 
         res.status(200).json({
             ok: true,
@@ -210,9 +197,9 @@ const deletePlaylist = async (req, res, next) => {
         });
 
     } catch (error) {
-        next(error)
+        next(error);
     }
-}
+};
 
 module.exports = {
     createPlaylist,
@@ -222,4 +209,4 @@ module.exports = {
     updatePlaylist,
     removeSongFromPlaylist,
     deletePlaylist
-}
+};

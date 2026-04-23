@@ -114,7 +114,8 @@ const login = async (req, res) => {
                     email,
                     password: crypto.randomBytes(16).toString('hex'),
                     verifiedEmail: true,
-                    role: 'user'
+                    role: 'user',
+                    profilePic: req.body.photoURL || null
                 });
                 await user.save();
             }
